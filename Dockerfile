@@ -28,6 +28,7 @@ WORKDIR /root/
 # Copy the Pre-built binary file from the previous stage
 COPY --from=builder /app/main .
 
-# Command to run the executable
-CMD ["./main"]
+# Command to run the binary with default flags
+CMD ["./main", "--cpu", "1", "--memory", "256", "--disk", "1000"]
+
 

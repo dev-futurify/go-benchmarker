@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -11,6 +12,21 @@ import (
 )
 
 func main() {
+	// Define command-line flags
+	cpuLoad := flag.Int("cpu", 0, "CPU load value (positive integer)")
+	memSize := flag.Int("memory", 0, "Memory size in MB (positive integer)")
+	distCount := flag.Int("disk", 0, "Disk Count Round (positive integer)")
+
+	// Parse command-line flags
+	flag.Parse()
+
+	// Validate flags
+	if *cpuLoad <= 0 || *memSize <= 0 || *distCount <= 0 {
+		fmt.Println("Usage: ./main --cpu <CPU> --memory <memory> --disk <disk>")
+		fmt.Println("All values must be positive integers.")
+		return
+	}
+
 	// Print basic system information
 	printSystemInfo()
 
@@ -18,7 +34,7 @@ func main() {
 	done := make(chan struct{})
 
 	// Run benchmarks with a 10-second timeout
-	go runBenchmarks(done)
+	go runBenchmarks(done, *cpuLoad, *memSize, *distCount)
 
 	// Wait for 10 seconds and then signal completion
 	select {
@@ -34,40 +50,40 @@ func printSystemInfo() {
 	fmt.Printf("Architecture: %s\n", runtime.GOARCH)
 
 	// Get CPU information
-	cpuInfo, _ := exec.Command("sysctl", "-n", "machdep.cpu.brand_string").Output()
+	cpuInfo, _ := exec.Command("uname", "-p").Output()
 	fmt.Printf("CPU Info: %s\n", cpuInfo)
 
 	// Get memory information
-	memInfo, _ := exec.Command("sysctl", "-n", "hw.memsize").Output()
-	fmt.Printf("Memory Info: %s bytes\n", memInfo)
+	memInfo, _ := exec.Command("grep", "MemTotal", "/proc/meminfo").Output()
+	fmt.Printf("Memory Info: %s", memInfo)
 
 	// Get disk information
 	diskInfo, _ := exec.Command("df", "-h").Output()
 	fmt.Printf("Disk Info:\n%s", diskInfo)
 }
 
-func runBenchmarks(done chan struct{}) {
+func runBenchmarks(done chan struct{}, cpuLoad int, memSize int, distCount int) {
 	// Benchmark CPU
 	fmt.Println("\nBenchmarking CPU...")
-	cpuBenchmark := runCPUBenchmark(done)
+	cpuBenchmark := runCPUBenchmark(done, cpuLoad)
 	fmt.Printf("CPU Benchmark Score: %d\n", cpuBenchmark)
 
 	// Benchmark Memory
 	fmt.Println("\nBenchmarking Memory...")
-	memBenchmark := runMemoryBenchmark(done)
-	fmt.Printf("Memory Benchmark Score: %.2f GB/s\n", memBenchmark)
+	memBenchmark := runMemoryBenchmark(done, memSize)
+	fmt.Printf("Memory Benchmark Score: %.2f MB/s\n", memBenchmark)
 
 	// Benchmark Disk (SSD) Performance
 	fmt.Println("\nBenchmarking Disk (SSD) Performance...")
-	diskBenchmark := runDiskBenchmark(done)
+	diskBenchmark := runDiskBenchmark(done, distCount)
 	fmt.Printf("Disk Benchmark Score: %.2f MB/s\n", diskBenchmark)
 }
 
-func runCPUBenchmark(done chan struct{}) int {
+func runCPUBenchmark(done chan struct{}, cpuLoad int) int {
 	// Measure CPU performance by calculating Fibonacci sequence
 	fib := make(chan int)
 	go func() {
-		fib <- fibonacci(40)
+		fib <- fibonacci(cpuLoad)
 	}()
 	select {
 	case <-done:
@@ -77,14 +93,11 @@ func runCPUBenchmark(done chan struct{}) int {
 	}
 }
 
-func runMemoryBenchmark(done chan struct{}) float64 {
+func runMemoryBenchmark(done chan struct{}, memSize int) float64 {
 	// Measure memory bandwidth by copying data between slices
-	// const dataSize = 1e9 // 1 GB
-	const dataSize = 1 << 28 // 256 MB
-
-	data := make([]byte, dataSize)
+	data := make([]byte, memSize*1024*1024) // Convert MB to bytes
 	start := time.Now()
-	for i := 0; i < dataSize; i++ {
+	for i := 0; i < len(data); i++ {
 		select {
 		case <-done:
 			return 0
@@ -93,12 +106,13 @@ func runMemoryBenchmark(done chan struct{}) float64 {
 		}
 	}
 	elapsed := time.Since(start)
-	return float64(dataSize) / (float64(elapsed) / float64(time.Second))
+	return float64(len(data)) / (float64(elapsed) / float64(time.Second)) / (1024 * 1024) // Convert to MB/s
 }
 
-func runDiskBenchmark(done chan struct{}) float64 {
+func runDiskBenchmark(done chan struct{}, distCount int) float64 {
 	// Measure disk (SSD) performance using the 'dd' command
-	cmd := exec.Command("dd", "if=/dev/zero", "of=/tmp/testfile", "bs=1M", "count=1000", "conv=sync")
+	cmd := exec.Command("dd", "if=/dev/zero", "of=/tmp/testfile", "bs=1M", fmt.Sprintf("count=%d", distCount), "conv=sync")
+
 	cmd.Stderr = nil
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -128,7 +142,6 @@ func runDiskBenchmark(done chan struct{}) float64 {
 	case "KB":
 		rate /= 1e3
 	case "MB":
-		// No conversion needed for MB
 	case "GB":
 		rate *= 1e3
 	default:
