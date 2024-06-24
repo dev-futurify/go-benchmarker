@@ -79,7 +79,9 @@ func runCPUBenchmark(done chan struct{}) int {
 
 func runMemoryBenchmark(done chan struct{}) float64 {
 	// Measure memory bandwidth by copying data between slices
-	const dataSize = 1e9 // 1 GB
+	// const dataSize = 1e9 // 1 GB
+	const dataSize = 1 << 28 // 256 MB
+
 	data := make([]byte, dataSize)
 	start := time.Now()
 	for i := 0; i < dataSize; i++ {
