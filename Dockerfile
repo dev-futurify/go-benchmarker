@@ -1,34 +1,33 @@
-# Use the official Golang image as a build stage
-FROM golang:1.22.4 AS builder
+# Start with a base image containing Go
+FROM golang:1.22.4 AS build
 
-# Set the Current Working Directory inside the container
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the Go Modules manifests
+# Copy the Go module files and download dependencies
 COPY go.mod ./
-
-# Download Go modules
 RUN go mod download
 
-# Copy the source from the current directory to the Working Directory inside the container
+# Copy the rest of the application code
 COPY . .
 
-# Build the Go app
+# Build the Go binary
 RUN go build -o main .
 
-# Start a new stage from scratch
+# Start a new stage to create a lean production image
 FROM alpine:latest
 
-# Add Maintainer info
-LABEL maintainer="adri@satusky.com"
-
-# Set the Current Working Directory inside the container
+# Set the working directory inside the container
 WORKDIR /root/
 
-# Copy the Pre-built binary file from the previous stage
-COPY --from=builder /app/main .
+# Copy the binary from the build stage
+COPY --from=build /app/main .
 
-# Command to run the binary with default flags
-CMD ["./main", "--cpu", "1", "--memory", "256", "--disk", "1000"]
+# Install necessary utilities (if any)
+RUN apk add --no-cache bash
 
+# Set the entry point to the Go binary
+ENTRYPOINT ["./main"]
 
+# Default command-line arguments
+CMD ["--cpu", "1", "--memory", "256", "--disk", "100"]
