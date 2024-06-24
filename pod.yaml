@@ -3,6 +3,9 @@ kind: Pod
 metadata:
   name: go-benchmarker
 spec:
+  nodeSelector:
+    kubernetes.io/hostname: worker-main-01-a
+  restartPolicy: Never
   containers:
     - name: go-benchmarker
       image: ricogustavo/go-benchmarker:latest
