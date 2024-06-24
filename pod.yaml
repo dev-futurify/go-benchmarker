@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: go-benchmarker
+spec:
+  containers:
+    - name: go-benchmarker
+      image: ricogustavo/go-benchmarker:latest
+      resources:
+        limits:
+          cpu: "1"
+          memory: "0.5Gi"
+        requests:
+          cpu: "1"
+          memory: "0.5Gi"
